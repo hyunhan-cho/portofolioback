@@ -16,8 +16,16 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from django.views.generic import TemplateView
+from django.http import HttpResponse
 
 urlpatterns = [
+    # 홈 페이지 (간단한 랜딩 페이지)
+    path('', TemplateView.as_view(template_name='index.html'), name='home'),
+
+    # 헬스 체크 엔드포인트
+    path('healthz/', lambda request: HttpResponse('ok'), name='healthz'),
+
     path('admin/', admin.site.urls),
     path('api/users/', include('users.urls')),
     path('api/chatbot/', include('chatbot.urls')),
