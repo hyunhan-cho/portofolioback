@@ -117,6 +117,14 @@ def _build_mysql_config():
     if 'serverTimezone' in query_params:
         options['init_command'] = f"SET time_zone = '{query_params['serverTimezone'][0]}'"
 
+    # MySQL Strict Mode 적용 (데이터 무결성 강화)
+    strict_modes = 'STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_ZERO_DATE,NO_ZERO_IN_DATE,NO_ENGINE_SUBSTITUTION'
+    existing_init = options.get('init_command')
+    if existing_init:
+        options['init_command'] = existing_init + f"; SET sql_mode='{strict_modes}'"
+    else:
+        options['init_command'] = f"SET sql_mode='{strict_modes}'"
+
     return {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': db_name,
@@ -207,7 +215,12 @@ OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 
 # CORS 설정 (프론트엔드와 연동 시)
 CORS_ALLOW_ALL_ORIGINS = os.getenv('CORS_ALLOW_ALL_ORIGINS', 'False') == 'True'
-CORS_ALLOWED_ORIGINS = os.getenv('CORS_ALLOWED_ORIGINS', '').split(',') if os.getenv('CORS_ALLOWED_ORIGINS') else []
+# 환경변수 오입력 방지: 'True' 같은 잘못된 값 제거, 스킴 없는 값 제거
+_raw_cors = os.getenv('CORS_ALLOWED_ORIGINS', '')
+if _raw_cors:
+    CORS_ALLOWED_ORIGINS = [o.strip() for o in _raw_cors.split(',') if '://' in o.strip()]
+else:
+    CORS_ALLOWED_ORIGINS = []
 
 # CORS 추가 설정
 CORS_ALLOW_CREDENTIALS = True  # 쿠키/인증 정보 허용
