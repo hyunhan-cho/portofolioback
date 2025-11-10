@@ -113,17 +113,15 @@ def _build_mysql_config():
     db_name = parsed.path.lstrip('/') if parsed.path else ''
     query_params = parse_qs(parsed.query)
     options = {}
-    # SSL 옵션 등 전달 (필요 시 확장)
+    # time_zone / sql_mode 를 하나의 SET 문으로 구성 (PyMySQL 다중 구문 금지 회피)
+    init_parts = []
     if 'serverTimezone' in query_params:
-        options['init_command'] = f"SET time_zone = '{query_params['serverTimezone'][0]}'"
-
+        init_parts.append(f"time_zone = '{query_params['serverTimezone'][0]}'")
     # MySQL Strict Mode 적용 (데이터 무결성 강화)
     strict_modes = 'STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_ZERO_DATE,NO_ZERO_IN_DATE,NO_ENGINE_SUBSTITUTION'
-    existing_init = options.get('init_command')
-    if existing_init:
-        options['init_command'] = existing_init + f"; SET sql_mode='{strict_modes}'"
-    else:
-        options['init_command'] = f"SET sql_mode='{strict_modes}'"
+    init_parts.append(f"sql_mode='{strict_modes}'")
+    if init_parts:
+        options['init_command'] = 'SET ' + ', '.join(init_parts)
 
     return {
         'ENGINE': 'django.db.backends.mysql',
