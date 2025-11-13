@@ -1,0 +1,13 @@
+# Cursor에서 무시할 파일/폴더 지정
+# .env는 읽을 수 있게 gitignore 무시
+!.env
+
+# 여전히 무시할 것들
+__pycache__/
+*.pyc
+myvenv/
+venv/
+node_modules/
+staticfiles/
+*.log
+

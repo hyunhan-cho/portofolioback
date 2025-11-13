@@ -18,10 +18,11 @@ from django.contrib import admin
 from django.urls import path, include
 from django.views.generic import TemplateView
 from django.http import HttpResponse
+from django.views.decorators.csrf import csrf_exempt
 
 urlpatterns = [
     # 홈 페이지 (간단한 랜딩 페이지)
-    path('', TemplateView.as_view(template_name='index.html'), name='home'),
+    path('', csrf_exempt(TemplateView.as_view(template_name='index.html')), name='home'),
 
     # 헬스 체크 엔드포인트
     path('healthz/', lambda request: HttpResponse('ok'), name='healthz'),

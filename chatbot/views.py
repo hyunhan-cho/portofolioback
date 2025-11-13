@@ -5,6 +5,42 @@ from rest_framework.permissions import IsAuthenticated
 from .serializers import ChatbotSerializer
 from .models import ChatMessage
 from django.conf import settings
+import os
+
+
+_PROFILE_CACHE = {"content": None, "mtime": None, "path": None}
+
+
+def _get_profile_md_path():
+    base_dir = getattr(settings, "BASE_DIR", None)
+    if not base_dir:
+        # settings에 BASE_DIR이 없다면 앱 기준 루트 추정
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(base_dir, "hyunhan.md")
+
+
+def _load_profile_context() -> str:
+    """루트 경로의 hyunhan.md를 읽어 캐시 후 반환. 실패 시 빈 문자열."""
+    try:
+        path = _get_profile_md_path()
+        mtime = os.path.getmtime(path)
+        if (
+            _PROFILE_CACHE.get("content") is None
+            or _PROFILE_CACHE.get("mtime") != mtime
+            or _PROFILE_CACHE.get("path") != path
+        ):
+            with open(path, "r", encoding="utf-8") as f:
+                content = f.read()
+            # 과도한 토큰 사용 방지를 위해 길이 제한
+            max_chars = 15000
+            if len(content) > max_chars:
+                content = content[:max_chars] + "\n\n[...생략됨: 파일이 매우 깁니다 ...]"
+            _PROFILE_CACHE["content"] = content
+            _PROFILE_CACHE["mtime"] = mtime
+            _PROFILE_CACHE["path"] = path
+        return str(_PROFILE_CACHE.get("content") or "")
+    except Exception:
+        return ""
 
 
 class ChatbotView(APIView):
@@ -18,13 +54,14 @@ class ChatbotView(APIView):
         serializer.is_valid(raise_exception=True)
         
         user_message = serializer.validated_data['message']
+        profile_context = _load_profile_context()
 
         # OpenAI API 통합 (환경변수 설정 시)
         api_key = getattr(settings, 'OPENAI_API_KEY', None)
         if api_key:
             # SDK 미설치 시 사용자에게 안내
             try:
-                from openai import OpenAI
+                from openai import OpenAI  # type: ignore[reportMissingImports]
             except Exception:
                 return Response({
                     "error": "AI 기능이 비활성화되어 있습니다. 서버에 openai 패키지를 설치해야 합니다.",
@@ -44,8 +81,18 @@ class ChatbotView(APIView):
                             "정확하고 간결하게 답하고, 공격적 표현은 중립적으로 재해석해. "
                             "사이트/기능/사용법/계정/보안/기술스택 질문에 친절히 답변해."
                         )
-                    }
+                    },
                 ]
+                if profile_context:
+                    messages.append({
+                        "role": "system",
+                        "content": (
+                            "다음은 조현한님의 공개 프로필/기술/수상/수료증 등 참고 자료(markdown/HTML)야. "
+                            "질문과 직접 관련 있을 때만 인용하고, 사실만 사용해. "
+                            "개인정보나 민감정보는 유출하지 말고 링크·이미지 URL은 설명으로만 다뤄.\n\n"
+                            f"{profile_context}"
+                        )
+                    })
                 for m in reversed(list(history_qs)):
                     messages.append({"role": "user", "content": m.user_message})
                     if m.bot_response:
